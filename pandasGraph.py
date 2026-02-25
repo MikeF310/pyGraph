@@ -3,6 +3,8 @@ import sys
 import os
 from openpyxl import load_workbook
 from openpyxl.utils.cell import coordinate_from_string
+import pandas as pd
+
 
 import matplotlib.pyplot as mpl
 from pathlib import Path
@@ -14,6 +16,18 @@ fileList = sys.argv[3:] #slice of srd index over (list of file directories)
 #xlfiles = Path(folderPath).iterdir()
 
 #if last char of folderPath is /, change nothing, otherwise append it to end
+
+#Convert the column letter to a number. 
+#A -> 1
+#AA -> 27
+def column_letter_to_number(col):
+    col = col.upper()
+    result = 0
+    for char in col:
+        result = result * 26 + (ord(char) - ord('A') + 1)
+    return result
+
+
 try:
     coordinate_from_string(cellNum)
 except Exception:
@@ -25,7 +39,7 @@ stringCells = 0
 errorCells = 0
 figure, axes = mpl.subplots()
 values = []
-indices = []
+x_names = []
 
     #for xlfile in sorted(list(xlfiles)):
 
@@ -34,33 +48,35 @@ def grabCell(xlfile):
     global emptyCells
     global stringCells
     global errorCells
-    currentFile = load_workbook(filename = (xlfile), data_only = True)
-    currentFile = currentFile.active
+    #currentFile = load_workbook(filename = (xlfile), data_only = True)
+    #currentFile = currentFile.active 
+    
+    
+    currentFile = pd.read_excel(xlfile, sheet_name=0, header=None) #Creates a pandas DataFrame
+    #cellNum[0] 'A', the column.
+    #cellNum[1] '1', the row
+    #iloc[row,col]
+    col_letters, row = coordinate_from_string(cellNum)
+    row_index = row - 1
+    col_index = column_letter_to_number(col_letters) - 1
+    print(f"Row: {row_index} Col: {col_index}")
 
- 
-    cellValue = currentFile[cellNum].value
-   
-    if(currentFile[cellNum].data_type == 'e'):
-        print("this cell has an error!")
-        errorCells += 1
-        return
-    if(currentFile[cellNum].data_type == 'f'):
-        print("this cell is a formula")
-        return
+    cellValue = currentFile.iat[row_index, col_index]
+    print(cellValue)
     if(cellValue == None):
         print(f"Cell {cellNum} in file {xlfile} is empty")
         emptyCells += 1
         return
+
     if(isinstance(cellValue,str)):
-        print(f"File {xlfile} contains string data")
+        print(f"File {xlfile} contains string data OR an error code!")
         #print(currentFile[cellNum].data_type)
         stringCells += 1
         return
     
     if(isinstance(cellValue,int) or isinstance(cellValue,float)):
         values.append(cellValue) #access the single chosen cell per file
-        index += 1
-        indices.append(index) #x-axis is 0, 1, 2, etc.
+        x_names.append(os.path.basename(xlfile))
     else:
         return
     
@@ -103,9 +119,9 @@ def fileLoop(fileList):
 
 fileLoop(fileList)
        
-print(indices)
+print(x_names)
 print(f"Values: {values}")
-axes.plot(indices,values)  
+axes.plot(x_names,values)  
 print("generating plot")
 mpl.savefig(imageName + ".png")
 print("plot generated")
